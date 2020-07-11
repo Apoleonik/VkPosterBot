@@ -81,3 +81,8 @@ class DbController:
             keys = ', '.join(map(lambda x: f'{x} = ?', channel_data.keys()))
             values = tuple(channel_data.values())
             self._cursor.execute(f"UPDATE channels SET {keys} WHERE id = {row_id}", values)
+
+    def create_db_dump(self):
+        with open('dump.sql', 'w') as f:
+            for line in self._connection.iterdump():
+                f.write(f'{line}\n')
