@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 class DbController:
@@ -28,22 +28,43 @@ class DbController:
         with self._connection:
             self._cursor.executescript(sql_data)
 
-    def _get_channel_columns(self) -> List[str]:
+    def _get_channel_columns(self) -> Tuple:
         """get channel table columns names"""
 
         self._cursor.execute("SELECT * FROM 'channels'")
-        columns = list(map(lambda row: row[0], self._cursor.description))
+        columns = tuple(map(lambda row: row[0], self._cursor.description))
         return columns
 
-    def _rows_to_dict(self, rows) -> List[Dict]:
+    @staticmethod
+    def _rows_to_dict(rows: List[Tuple], columns: Tuple) -> List[Dict]:
         """convert sql row tuple to dict"""
         channels = []
         for row in rows:
             row_dict = {}
-            for index, column in enumerate(self._channel_columns):
+            for index, column in enumerate(columns):
                 row_dict[column] = row[index]
             channels.append(row_dict)
         return channels
+
+    def _insert(self, table: str, column_values: Dict):
+        """insert values to selected table"""
+        with self._connection:
+            joined_columns = ", ".join(column_values.keys())
+            values = tuple(column_values.values())
+            placeholders = ", ".join("?" * len(column_values.keys()))
+            self._cursor.execute(f"INSERT INTO '{table}' ({joined_columns}) VALUES ({placeholders})", values)
+
+    def _delete(self, table: str, row_id: int):
+        """delete row from selected table"""
+        with self._connection:
+            self._cursor.execute(f"delete from '{table}' where id={row_id}")
+
+    def _fetch(self, table: str, columns: List[str] = ''):
+        """get columns from selected table"""
+        joined_columns = ', '.join(columns) if columns else '*'
+        self._cursor.execute(f"SELECT {joined_columns} from '{table}'")
+        rows = self._cursor.fetchall()
+        return rows
 
     def get_cursor(self):
         """get db cursor"""
@@ -51,29 +72,23 @@ class DbController:
 
     def get_all_channels(self) -> List[Dict]:
         """get all channels rows from db"""
-        self._cursor.execute("SELECT * from 'channels'")
-        rows = self._cursor.fetchall()
-        channels = self._rows_to_dict(rows)
+        rows = self._fetch('channels')
+        channels = self._rows_to_dict(rows, self._channel_columns)
         return channels
 
     def get_channel(self, telegram_channel: str) -> List[Dict]:
         """get channel row from db and filtered by telegram_channel key"""
         self._cursor.execute(f"SELECT * from 'channels' where telegram_channel='{telegram_channel}'")
         rows = self._cursor.fetchall()
-        return self._rows_to_dict(rows)
+        return self._rows_to_dict(rows[:1], self._channel_columns)
 
     def add_channel(self, channel_data: Dict):
         """add channel row to channels table"""
-        with self._connection:
-            joined_columns = ", ".join(channel_data.keys())
-            values = tuple(channel_data.values())
-            placeholders = ", ".join("?" * len(channel_data.keys()))
-            self._cursor.execute(f"INSERT INTO 'channels' ({joined_columns}) VALUES ({placeholders})", values)
+        self._insert('channels', channel_data)
 
     def delete_channel(self, row_id: int):
         """delete channel row from channels table"""
-        with self._connection:
-            self._cursor.execute(f"delete from 'channels' where id={row_id}")
+        self._delete('channels', row_id)
 
     def update_channel(self, row_id: int, channel_data: Dict):
         """update channel row in channels table"""
@@ -81,6 +96,20 @@ class DbController:
             keys = ', '.join(map(lambda x: f'{x} = ?', channel_data.keys()))
             values = tuple(channel_data.values())
             self._cursor.execute(f"UPDATE channels SET {keys} WHERE id = {row_id}", values)
+
+    def get_blacklist_words(self) -> Tuple:
+        """get all blacklist words from blacklist table"""
+        rows = self._fetch('blacklist', 'word'.split())
+        words = tuple(map(lambda x: x[0], rows))
+        return words
+
+    def add_blacklist_word(self, word: str):
+        """add blacklist word row to blacklist table"""
+        self._insert('blacklist', {'word': word})
+
+    def delete_blacklist_word(self, row_id: int):
+        """delete blacklist word row from blacklist table"""
+        self._delete('blacklist', row_id)
 
     def create_db_dump(self):
         with open('dump.sql', 'w') as f:
