@@ -10,3 +10,8 @@ CREATE TABLE channels (
     send_text_post boolean default false,
     timer integer default 60
 );
+
+CREATE TABLE blacklist (
+    id integer primary key,
+    word varchar(255) UNIQUE NOT NULL
+);
