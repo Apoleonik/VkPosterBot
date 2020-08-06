@@ -76,11 +76,18 @@ class DbController:
         channels = self._rows_to_dict(rows, self._channel_columns)
         return channels
 
-    def get_channel(self, telegram_channel: str) -> List[Dict]:
-        """get channel row from db and filtered by telegram_channel key"""
-        self._cursor.execute(f"SELECT * from 'channels' where telegram_channel='{telegram_channel}'")
+    def get_channel(self, row_id: int) -> List[Dict]:
+        """get channel by row from db"""
+        self._cursor.execute(f"SELECT * from 'channels' where id='{row_id}'")
         rows = self._cursor.fetchall()
-        return self._rows_to_dict(rows[:1], self._channel_columns)
+        return self._rows_to_dict(rows, self._channel_columns)
+
+    def get_channel_by_tg_vk_channel_key(self, telegram_channel: str, vk_channel: str):
+        """get channel row from db filtered by telegram_channel and vk_channel key"""
+        self._cursor.execute(f"SELECT * from 'channels' where telegram_channel='{telegram_channel}' "
+                             f"and vk_channel='{vk_channel}'")
+        rows = self._cursor.fetchall()
+        return self._rows_to_dict(rows, self._channel_columns)
 
     def add_channel(self, channel_data: Dict):
         """add channel row to channels table"""
