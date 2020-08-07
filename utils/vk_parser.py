@@ -2,8 +2,8 @@ import asyncio
 from typing import Dict, List, NamedTuple
 from collections import defaultdict
 
-from api import VkApi
-from db import DbController
+from utils.api import VkApi
+from utils.db import DbController
 
 
 class Post(NamedTuple):

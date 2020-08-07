@@ -2,7 +2,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from handlers.middleware import AccessMiddleware
-from controller import Controller
+from utils.controller import Controller
 
 from config import config
 

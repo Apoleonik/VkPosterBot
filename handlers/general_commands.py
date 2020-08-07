@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.types.message import ParseMode
 
 from misc import bot, dp, controller
-import utils
+from utils import utils
 
 
 @dp.message_handler(commands=['menu'])

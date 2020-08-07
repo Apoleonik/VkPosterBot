@@ -1,6 +1,6 @@
 from typing import Dict
 
-from vk_parser import VkParser
+from utils.vk_parser import VkParser
 
 
 class Controller:

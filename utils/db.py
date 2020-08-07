@@ -23,7 +23,7 @@ class DbController:
     def _init_db(self):
         """initialize db"""
 
-        with open("config/create_db.sql") as f:
+        with open("../config/create_db.sql") as f:
             sql_data = f.read()
         with self._connection:
             self._cursor.executescript(sql_data)
