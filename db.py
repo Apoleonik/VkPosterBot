@@ -23,7 +23,7 @@ class DbController:
     def _init_db(self):
         """initialize db"""
 
-        with open("create_db.sql") as f:
+        with open("config/create_db.sql") as f:
             sql_data = f.read()
         with self._connection:
             self._cursor.executescript(sql_data)
@@ -104,10 +104,13 @@ class DbController:
             values = tuple(channel_data.values())
             self._cursor.execute(f"UPDATE channels SET {keys} WHERE id = {row_id}", values)
 
-    def get_blacklist_words(self) -> Tuple:
+    def get_blacklist_words(self, get_id=False) -> List:
         """get all blacklist words from blacklist table"""
-        rows = self._fetch('blacklist', 'word'.split())
-        words = tuple(map(lambda x: x[0], rows))
+        rows = self._fetch('blacklist', ['id', 'word'])
+        words = list(map(lambda x: x[1], rows))
+        words_dict = list(map(lambda x: {'id': x[0], 'word': x[1]}, rows))
+        if get_id:
+            return words_dict
         return words
 
     def add_blacklist_word(self, word: str):

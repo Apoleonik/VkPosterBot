@@ -24,7 +24,6 @@ class VkParser(VkApi):
         self.channels = self.db.get_all_channels()
         self.loop = asyncio.get_event_loop()
 
-        self._channels_changed = True
         self.channels_tasks = {}
 
     @staticmethod
@@ -56,21 +55,6 @@ class VkParser(VkApi):
         if is_allowed_text and not is_ads and not is_shared and not is_pinned:
             return True
 
-    # async def check_channels_task(self):
-    #     while True:
-    #         if self._channels_changed:
-    #             await self.close_all_channels_tasks()
-    #
-    #             self.channels = self.db.get_all_channels()
-    #             for channel in self.channels:
-    #                 if channel['is_active']:
-    #                     task = self.loop.create_task(self.create_channel_task(channel), name=channel['id'])
-    #                     self.channels_tasks[channel['id']] = {'channel_data': channel, 'task': task}
-    #
-    #             self._channels_changed = False
-    #
-    #         await asyncio.sleep(60 * 5)
-
     async def close_all_channels_tasks(self):
         """close all channels running tasks"""
         if self.channels_tasks:
@@ -95,7 +79,7 @@ class VkParser(VkApi):
         # TODO отправка в телеграм через aiogram
         while True:
             wall_posts = await self.get_wall_posts(channel_data)
-            is_correct = wall_posts.get('response') and wall_posts['response']['count']
+            is_correct = wall_posts.get('response') and wall_posts['response'].get('count')
             if is_correct:
                 posts = wall_posts['response']['items']
                 for post in reversed(posts):
@@ -121,19 +105,17 @@ class VkParser(VkApi):
 
             await asyncio.sleep(60 * channel_data['timer'])
 
-    def run(self):
+    async def run(self):
         """start vk parser"""
-        # self.loop.create_task(self.check_channels_task(), name='0')
         self.channels = self.db.get_all_channels()
         for channel in self.channels:
             if channel['is_active']:
                 task = self.loop.create_task(self.check_channel(channel), name=channel['id'])
                 self.channels_tasks[channel['id']] = {'channel_data': channel, 'task': task}
-        self.loop.run_forever()
 
-    def stop(self):
+    async def stop(self):
         """stop vk parser"""
-        self.loop.stop()
+        await self.close_all_channels_tasks()
 
 # TODO
 #  1. 70% (добавить проверку на уникальность контента) дописать алгоритм для создания задач по проверке новых постов в группах вк
