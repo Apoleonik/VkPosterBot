@@ -38,13 +38,13 @@ async def process_callback_menu(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('channels'))
 async def process_callback_channels(callback_query: types.CallbackQuery):
+    """Show channels and detailed channel menus"""
     chat_id = callback_query.message.chat.id
     message_id = callback_query.message.message_id
 
-    btn_code = callback_query.data[-1]
-    if btn_code.isdigit():
-        btn_code = int(btn_code)
-
+    query_data = callback_query.data.split('-')
+    if 'page' not in query_data and ''.join(query_data[1:]).isdigit():
+        btn_code = int(query_data[1])
         kb, formatted_text = utils.get_channel_detail_kb(controller, btn_code)
         await bot.edit_message_text(text=formatted_text, chat_id=chat_id, message_id=message_id,
                                     parse_mode=ParseMode.MARKDOWN_V2)
@@ -52,7 +52,9 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
     else:
         await bot.edit_message_text(text=utils.get_bot_status(controller), chat_id=chat_id,
                                     message_id=message_id, parse_mode=ParseMode.MARKDOWN_V2)
-        await bot.edit_message_reply_markup(chat_id, message_id, reply_markup=utils.get_channels_kb(controller))
+        page_num = int(query_data[-1]) if 'page' in callback_query.data else None
+        await bot.edit_message_reply_markup(chat_id, message_id,
+                                            reply_markup=utils.get_channels_kb(controller, 'channels', page_num))
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('edit'))
@@ -74,6 +76,10 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
             channel.update({key: not channel[key]})
             await controller.update_channel(channel['id'], channel)
 
+        if btn_code == 98:
+            channel.update({'last_post_id': 0})
+            await controller.update_channel(channel['id'], channel)
+
         if not btn_code == 99:
             kb, formatted_text = utils.get_channel_detail_kb(controller, channel['id'])
             await bot.edit_message_text(text=formatted_text, chat_id=chat_id, message_id=message_id,
@@ -86,7 +92,8 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
                                         message_id=message_id, parse_mode=ParseMode.MARKDOWN_V2)
             await bot.edit_message_reply_markup(chat_id, message_id, reply_markup=utils.get_menu_kb(controller))
     else:
-        await bot.edit_message_reply_markup(chat_id, message_id, reply_markup=utils.get_channels_kb(controller))
+        await bot.edit_message_reply_markup(chat_id, message_id,
+                                            reply_markup=utils.get_channels_kb(controller, 'channels'))
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('bl'))
@@ -94,11 +101,13 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
     chat_id = callback_query.message.chat.id
     message_id = callback_query.message.message_id
 
-    btn_code = callback_query.data[-1]
-    if btn_code.isdigit():
-        btn_code = int(btn_code)
+    query_data = callback_query.data.split('-')
+    if 'page' not in query_data and ''.join(query_data[1:]).isdigit():
+        btn_code = int(query_data[1])
         await controller.remove_blacklist_word(btn_code)
 
     await bot.edit_message_text(text=utils.get_bot_status(controller), chat_id=chat_id,
                                 message_id=message_id, parse_mode=ParseMode.MARKDOWN_V2)
-    await bot.edit_message_reply_markup(chat_id, message_id, reply_markup=utils.get_blacklist_kb(controller))
+    page_num = int(query_data[-1]) if 'page' in callback_query.data else None
+    await bot.edit_message_reply_markup(chat_id, message_id,
+                                        reply_markup=utils.get_blacklist_kb(controller, 'bl', page_num))

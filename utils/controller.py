@@ -4,10 +4,9 @@ from utils.vk_parser import VkParser
 
 
 class Controller:
-    def __init__(self, access_token: str):
-        self.parser = VkParser(access_token)
+    def __init__(self, access_token: str, telegram_bot):
+        self.parser = VkParser(access_token, telegram_bot)
         self.db = self.parser.db
-
         self.is_working = False
 
     async def toggle_working(self):

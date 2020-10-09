@@ -1,7 +1,6 @@
-import json
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.utils.markdown import text, bold, italic, code, pre
+from aiogram.utils.markdown import text, bold
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types.message import ParseMode
 
@@ -44,7 +43,7 @@ async def add_channel_step_2(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=AddChannelState.telegram_channel, content_types=types.ContentTypes.TEXT)
 async def add_channel_step_3(message: types.Message, state: FSMContext):
-    await state.update_data(telegram_channel=message.text.lower())
+    await state.update_data(telegram_channel=''.join(message.text.lower().split('@')))
     await AddChannelState.timer.set()
     await message.answer(text("Send channel", bold("timer")), parse_mode=ParseMode.MARKDOWN_V2)
 

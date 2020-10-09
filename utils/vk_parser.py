@@ -1,9 +1,12 @@
 import asyncio
 from typing import Dict, List, NamedTuple
 from collections import defaultdict
+from aiogram import Bot
+from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from utils.api import VkApi
 from utils.db import DbController
+from utils.utils import normalize_channel_name
 
 
 class Post(NamedTuple):
@@ -16,9 +19,10 @@ class Post(NamedTuple):
 
 
 class VkParser(VkApi):
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: str, bot: Bot):
         super().__init__(access_token)
 
+        self.bot = bot
         self.db = DbController()
         self.blacklist_words = self.db.get_blacklist_words()
         self.channels = self.db.get_all_channels()
@@ -76,8 +80,8 @@ class VkParser(VkApi):
     async def check_channel(self, channel_data: Dict):
         """check vk channel for new posts and filter them, send content to telegram soon..."""
         # TODO оптимизация те создание очереди с постами, чтоб по кд не обращаться к апи ???
-        # TODO отправка в телеграм через aiogram
         while True:
+            telegram_channel = await normalize_channel_name(channel_data['telegram_channel'])
             wall_posts = await self.get_wall_posts(channel_data)
             is_correct = wall_posts.get('response') and wall_posts['response'].get('count')
             if is_correct:
@@ -91,13 +95,17 @@ class VkParser(VkApi):
                         photo_attachments = parsed_post.attachments.get('photo')
                         video_attachments = parsed_post.attachments.get('video')
                         if channel_data['send_photo_post'] and photo_attachments:
-                            print(photo_attachments)
+                            prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
+                            await self.bot.send_media_group(telegram_channel, prepared_photo)
                             break
                         elif channel_data['send_video_post'] and video_attachments:
+                            prepared_video = []
                             for video_id in video_attachments:
                                 video_data = await self.get_video_data(video_id)
                                 parsed_video_data = video_data['response']['items'][0]['files']
-                                print(parsed_video_data)
+                                video_quality = list(parsed_video_data.keys())
+                                prepared_video.append(InputMediaVideo(parsed_video_data[video_quality[-1]]))
+                            await self.bot.send_media_group(telegram_channel, prepared_video)
                             break
                 else:
                     print('no new posts')
@@ -121,5 +129,6 @@ class VkParser(VkApi):
 #  1. 70% (добавить проверку на уникальность контента) дописать алгоритм для создания задач по проверке новых постов в группах вк
 #  2. DONE добавить в стурктуру бд флаг 'Active' для канала
 #  3. DONE (NOT TESTED) добавить функции для удаления и создания тасков для каждого канала по отдельности
-#  4. создание
-#  5. Отправка в телеграм через aiogram
+#  5. DONE Отправка в телеграм через aiogram
+#  6. DONE Добавить постраничную навигацию
+#  7. Добавить логгирование
