@@ -19,10 +19,11 @@ class Post(NamedTuple):
 
 
 class VkParser(VkApi):
-    def __init__(self, access_token: str, bot: Bot):
+    def __init__(self, access_token: str, bot: Bot, logger):
         super().__init__(access_token)
 
         self.bot = bot
+        self.logger = logger
         self.db = DbController()
         self.blacklist_words = self.db.get_blacklist_words()
         self.channels = self.db.get_all_channels()
@@ -71,15 +72,16 @@ class VkParser(VkApi):
         if self.channels_tasks and data:
             data['task'].cancel()
             del self.channels_tasks[task_id]
+        self.logger.debug(f'Closed channel task with id: {task_id}')
 
     async def create_channel_task(self, channel_data: Dict):
         """create channel check task"""
         task = self.loop.create_task(self.check_channel(channel_data), name=channel_data['id'])
         self.channels_tasks[channel_data['id']] = {'channel_data': channel_data, 'task': task}
+        self.logger.debug(f'Created channel task for {channel_data["telegram_channel"]} (id: {channel_data["id"]})')
 
     async def check_channel(self, channel_data: Dict):
         """check vk channel for new posts and filter them, send content to telegram soon..."""
-        # TODO оптимизация те создание очереди с постами, чтоб по кд не обращаться к апи ???
         while True:
             telegram_channel = await normalize_channel_name(channel_data['telegram_channel'])
             wall_posts = await self.get_wall_posts(channel_data)
@@ -89,6 +91,7 @@ class VkParser(VkApi):
                 for post in reversed(posts):
                     post_id = int(post.get('id'))
                     if post_id > channel_data['last_post_id'] and await self.is_allowed_post(post):
+                        self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> {channel_data["telegram_channel"]}')
                         channel_data['last_post_id'] = post_id
 
                         parsed_post = await self._parse_post(post)
@@ -108,7 +111,8 @@ class VkParser(VkApi):
                             await self.bot.send_media_group(telegram_channel, prepared_video)
                             break
                 else:
-                    print('no new posts')
+                    self.logger.info(f'No new posts from {channel_data["vk_channel"]}')
+
                 self.db.update_channel(channel_data['id'], channel_data)
 
             await asyncio.sleep(60 * channel_data['timer'])
@@ -120,15 +124,8 @@ class VkParser(VkApi):
             if channel['is_active']:
                 task = self.loop.create_task(self.check_channel(channel), name=channel['id'])
                 self.channels_tasks[channel['id']] = {'channel_data': channel, 'task': task}
+                self.logger.debug(f'Started task for {channel["vk_channel"]} -> {channel["telegram_channel"]}')
 
     async def stop(self):
         """stop vk parser"""
         await self.close_all_channels_tasks()
-
-# TODO
-#  1. 70% (добавить проверку на уникальность контента) дописать алгоритм для создания задач по проверке новых постов в группах вк
-#  2. DONE добавить в стурктуру бд флаг 'Active' для канала
-#  3. DONE (NOT TESTED) добавить функции для удаления и создания тасков для каждого канала по отдельности
-#  5. DONE Отправка в телеграм через aiogram
-#  6. DONE Добавить постраничную навигацию
-#  7. Добавить логгирование
