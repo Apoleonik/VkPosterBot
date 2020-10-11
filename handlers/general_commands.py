@@ -16,13 +16,20 @@ async def display_start(message: types.Message):
                                 '/add - add new channel to parser',
                                 '/blacklist - add word to blacklist',
                                 '/log - get bot log',
+                                '/dump - get bot db dump',
                                 sep='\n'))
     await message.answer(prepared_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 @dp.message_handler(commands=['log'])
-async def display_start(message: types.Message):
+async def send_log_file(message: types.Message):
     await message.answer_document(InputFile(os.path.join(PATH, 'log.txt')))
+
+
+@dp.message_handler(commands=['dump'])
+async def send_db_dump_file(message: types.Message):
+    db_path = controller.db.create_db_dump()
+    await message.answer_document(InputFile(db_path))
 
 
 @dp.message_handler(commands=['menu'])

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import sqlite3
 
 from typing import Dict, List, Tuple
@@ -125,7 +126,7 @@ class DbController:
         self._delete('blacklist', row_id)
 
     def create_db_dump(self):
-        db_dump_path = os.path.join(PATH, 'db_dump.sql')
+        db_dump_path = os.path.join(PATH, 'db', f'db_dump_{datetime.now().strftime("%d-%m-%y_%H-%M")}.sql')
         with open(db_dump_path, 'w') as f:
             for line in self._connection.iterdump():
                 f.write(f'{line}\n')
