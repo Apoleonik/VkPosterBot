@@ -4,9 +4,12 @@ import sqlite3
 from typing import Dict, List, Tuple
 
 
+PATH = os.path.dirname(os.path.dirname(__file__))
+
+
 class DbController:
     def __init__(self):
-        self._connection = sqlite3.connect(os.path.join('db', 'channels.db'))
+        self._connection = sqlite3.connect(os.path.join(PATH, 'db', 'channels.db'))
         self._cursor = self._connection.cursor()
 
         self._check_db_exists()
@@ -23,7 +26,7 @@ class DbController:
     def _init_db(self):
         """initialize db"""
 
-        with open("../config/create_db.sql") as f:
+        with open(os.path.join(PATH, 'config', 'create_db.sql')) as f:
             sql_data = f.read()
         with self._connection:
             self._cursor.executescript(sql_data)
@@ -122,6 +125,8 @@ class DbController:
         self._delete('blacklist', row_id)
 
     def create_db_dump(self):
-        with open('dump.sql', 'w') as f:
+        db_dump_path = os.path.join(PATH, 'db_dump.sql')
+        with open(db_dump_path, 'w') as f:
             for line in self._connection.iterdump():
                 f.write(f'{line}\n')
+            return db_dump_path
