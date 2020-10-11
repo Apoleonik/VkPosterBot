@@ -15,6 +15,6 @@ logger = logging.getLogger('main')
 
 bot = Bot(token=config.TELEGRAM_TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
-dp.middleware.setup(AccessMiddleware(config.ADMIN_ID))
+dp.middleware.setup(AccessMiddleware(config.ADMIN_ID, logger))
 
 controller = Controller(config.VK_TOKEN, bot, logger)

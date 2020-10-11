@@ -1,8 +1,19 @@
 from aiogram import types
 from aiogram.types.message import ParseMode
+from aiogram.utils.markdown import text, bold, italic
 
 from misc import bot, dp, controller
 from utils import utils
+
+
+@dp.message_handler(commands=['start', 'help'])
+async def display_start(message: types.Message):
+    prepared_text = text('Available Bot commands:\n',
+                         italic('/menu - get bot menu',
+                                '/add - add new channel to parser',
+                                '/blacklist - add word to blacklist',
+                                sep='\n'))
+    await message.answer(prepared_text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 @dp.message_handler(commands=['menu'])
