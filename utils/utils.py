@@ -101,4 +101,4 @@ def format_channel_preview(channel_data):
 
 async def normalize_channel_name(channel_name):
     """preparing telegram channel name"""
-    return '@'.join(channel_name) if not channel_name.isdigit() else channel_name
+    return f'@{channel_name}' if not channel_name.isdigit() else channel_name

@@ -107,10 +107,34 @@ class VkParser(VkApi):
                 self.db.update_channel(channel_data['id'], channel_data)
             await asyncio.sleep(60 * channel_data['timer'])
 
+    async def prepare_content(self, channel_data, parsed_post):
+        """prepare post content before send to telegram channel"""
+        prepared_content = {}
+        photo_text = parsed_post.text if channel_data['send_photo_post_text'] else ''
+        video_text = parsed_post.text if channel_data['send_video_post_text'] else ''
+        photo_attachments = parsed_post.attachments.get('photo')
+        video_attachments = parsed_post.attachments.get('video')
+        if channel_data['send_photo_post'] and photo_attachments:
+            prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
+            prepared_photo[0].caption = photo_text
+            prepared_content.update({'photo': prepared_photo})
+        elif channel_data['send_video_post'] and video_attachments:
+            prepared_video = {}
+            for video_id in video_attachments:
+                video_data = await self.get_video_data(video_id)
+                parsed_video_data = video_data['response']['items'][0]['files']
+                prepared_video = {quality: InputMediaVideo(video, caption=video_text)
+                                  for quality, video in parsed_video_data.items()}
+            prepared_content.update({'video': prepared_video})
+        elif channel_data['send_text_post'] and parsed_post.text and\
+                not channel_data['send_video_post'] or channel_data['send_photo_post']:
+            prepared_content.update({'text': parsed_post.text})
+        return prepared_content
+
     async def send_content(self, channel_data: Dict, prepared_content: Dict, post_url: str):
         """send content to telegram"""
         telegram_channel = await normalize_channel_name(channel_data['telegram_channel'])
-        while prepared_content.get('video') or prepared_content.get('photo'):
+        while prepared_content.get('video') or prepared_content.get('photo') or prepared_content.get('text'):
             content_to_send = []
             for content_type, content in prepared_content.items():
                 if content_type == 'video':
@@ -118,9 +142,16 @@ class VkParser(VkApi):
                     content_to_send.append(video)
                 elif content_type == 'photo':
                     content_to_send.extend(content)
+                elif content_type == 'text':
+                    content_to_send.append(content)
+                    pass
             try:
-                await self.bot.send_media_group(telegram_channel, content_to_send)
-                break
+                if not isinstance(content_to_send.pop(), str):
+                    await self.bot.send_media_group(telegram_channel, content_to_send)
+                    break
+                else:
+                    await self.bot.send_message(telegram_channel, content_to_send.pop())
+                    break
             except Exception as error:
                 self.logger.error(f"While sending post {post_url}: {error}")
                 text = f'***Post:*** [link]({post_url})\n***Error:*** {error} '
@@ -128,23 +159,6 @@ class VkParser(VkApi):
                 if not prepared_content.get('video'):
                     break
                 await asyncio.sleep(5)
-
-    async def prepare_content(self, channel_data, parsed_post):
-        """prepare post content before send to telegram channel"""
-        prepared_content = {}
-        photo_attachments = parsed_post.attachments.get('photo')
-        video_attachments = parsed_post.attachments.get('video')
-        if channel_data['send_photo_post'] and photo_attachments:
-            prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
-            prepared_content.update({'photo': prepared_photo})
-        elif channel_data['send_video_post'] and video_attachments:
-            prepared_video = {}
-            for video_id in video_attachments:
-                video_data = await self.get_video_data(video_id)
-                parsed_video_data = video_data['response']['items'][0]['files']
-                prepared_video = {quality: InputMediaVideo(video) for quality, video in parsed_video_data.items()}
-            prepared_content.update({'video': prepared_video})
-        return prepared_content
 
     async def run(self):
         """start vk parser"""
