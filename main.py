@@ -7,7 +7,6 @@ if __name__ == '__main__':
     logger.info('Start telegram bot')
     executor.start_polling(dp, skip_updates=True)
 
-
 # TODO
 #  1. 70% (добавить проверку на уникальность контента) дописать алгоритм для создания задач по проверке новых постов в группах вк
 #  2. DONE добавить в стурктуру бд флаг 'Active' для канала

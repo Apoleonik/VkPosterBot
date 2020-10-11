@@ -1,8 +1,11 @@
+import os
+
 from aiogram import types
 from aiogram.types.message import ParseMode
 from aiogram.utils.markdown import text, bold, italic
+from aiogram.types import InputFile
 
-from misc import bot, dp, controller
+from misc import bot, dp, controller, PATH
 from utils import utils
 
 
@@ -12,8 +15,14 @@ async def display_start(message: types.Message):
                          italic('/menu - get bot menu',
                                 '/add - add new channel to parser',
                                 '/blacklist - add word to blacklist',
+                                '/log - get bot log',
                                 sep='\n'))
     await message.answer(prepared_text, parse_mode=ParseMode.MARKDOWN_V2)
+
+
+@dp.message_handler(commands=['log'])
+async def display_start(message: types.Message):
+    await message.answer_document(InputFile(os.path.join(PATH, 'log.txt')))
 
 
 @dp.message_handler(commands=['menu'])

@@ -8,6 +8,8 @@ from utils.api import VkApi
 from utils.db import DbController
 from utils.utils import normalize_channel_name
 
+from config.config import ADMIN_ID
+
 
 class Post(NamedTuple):
     """Contains parsed vk post"""
@@ -83,7 +85,6 @@ class VkParser(VkApi):
     async def check_channel(self, channel_data: Dict):
         """check vk channel for new posts and filter them, send content to telegram soon..."""
         while True:
-            telegram_channel = await normalize_channel_name(channel_data['telegram_channel'])
             wall_posts = await self.get_wall_posts(channel_data)
             is_correct = wall_posts.get('response') and wall_posts['response'].get('count')
             if is_correct:
@@ -91,31 +92,59 @@ class VkParser(VkApi):
                 for post in reversed(posts):
                     post_id = int(post.get('id'))
                     if post_id > channel_data['last_post_id'] and await self.is_allowed_post(post):
-                        self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> {channel_data["telegram_channel"]}')
                         channel_data['last_post_id'] = post_id
 
                         parsed_post = await self._parse_post(post)
-                        photo_attachments = parsed_post.attachments.get('photo')
-                        video_attachments = parsed_post.attachments.get('video')
-                        if channel_data['send_photo_post'] and photo_attachments:
-                            prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
-                            await self.bot.send_media_group(telegram_channel, prepared_photo)
-                            break
-                        elif channel_data['send_video_post'] and video_attachments:
-                            prepared_video = []
-                            for video_id in video_attachments:
-                                video_data = await self.get_video_data(video_id)
-                                parsed_video_data = video_data['response']['items'][0]['files']
-                                video_quality = list(parsed_video_data.keys())
-                                prepared_video.append(InputMediaVideo(parsed_video_data[video_quality[-1]]))
-                            await self.bot.send_media_group(telegram_channel, prepared_video)
+                        post_url = f"https://vk.com/{channel_data['vk_channel']}?w=wall{post['from_id']}_{post['id']}"
+                        prepared_content = await self.prepare_content(channel_data, parsed_post)
+                        if prepared_content:
+                            self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> '
+                                             f'{channel_data["telegram_channel"]}')
+                            await self.send_content(channel_data, prepared_content, post_url)
                             break
                 else:
                     self.logger.info(f'No new posts from {channel_data["vk_channel"]}')
-
                 self.db.update_channel(channel_data['id'], channel_data)
-
             await asyncio.sleep(60 * channel_data['timer'])
+
+    async def send_content(self, channel_data: Dict, prepared_content: Dict, post_url: str):
+        """send content to telegram"""
+        telegram_channel = await normalize_channel_name(channel_data['telegram_channel'])
+        while prepared_content.get('video') or prepared_content.get('photo'):
+            content_to_send = []
+            for content_type, content in prepared_content.items():
+                if content_type == 'video':
+                    quality, video = prepared_content.get('video').popitem()
+                    content_to_send.append(video)
+                elif content_type == 'photo':
+                    content_to_send.extend(content)
+            try:
+                await self.bot.send_media_group(telegram_channel, content_to_send)
+                break
+            except Exception as error:
+                self.logger.error(f"While sending post {post_url}: {error}")
+                text = f'***Post:*** [link]({post_url})\n***Error:*** {error} '
+                await self.bot.send_message(ADMIN_ID, text, parse_mode='MARKDOWN', disable_web_page_preview=True)
+                if not prepared_content.get('video'):
+                    break
+                await asyncio.sleep(5)
+
+    async def prepare_content(self, channel_data, parsed_post):
+        """prepare post content before send to telegram channel"""
+        prepared_content = {}
+        photo_attachments = parsed_post.attachments.get('photo')
+        video_attachments = parsed_post.attachments.get('video')
+        if channel_data['send_photo_post'] and photo_attachments:
+            prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
+            prepared_content.update({'photo': prepared_photo})
+        elif channel_data['send_video_post'] and video_attachments:
+            prepared_video = {}
+            for video_id in video_attachments:
+                video_data = await self.get_video_data(video_id)
+                parsed_video_data = video_data['response']['items'][0]['files']
+                prepared_video = {quality: InputMediaVideo(video) for quality, video in parsed_video_data.items()}
+            prepared_content.update({'video': prepared_video})
+        return prepared_content
 
     async def run(self):
         """start vk parser"""
