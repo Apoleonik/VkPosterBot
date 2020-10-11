@@ -127,7 +127,7 @@ class DbController:
 
     def create_db_dump(self):
         db_dump_path = os.path.join(PATH, 'db', f'db_dump_{datetime.now().strftime("%d-%m-%y_%H-%M")}.sql')
-        with open(db_dump_path, 'w') as f:
+        with open(db_dump_path, 'w', encoding='UTF-8') as f:
             for line in self._connection.iterdump():
                 f.write(f'{line}\n')
             return db_dump_path
