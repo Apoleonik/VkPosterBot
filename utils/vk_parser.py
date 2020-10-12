@@ -89,6 +89,11 @@ class VkParser(VkApi):
             is_correct = wall_posts.get('response') and wall_posts['response'].get('count')
             if is_correct:
                 posts = wall_posts['response']['items']
+                if channel_data['set_last_post_id']:
+                    posts_id = [post['id'] for post in posts]
+                    posts_id.sort()
+                    channel_data['last_post_id'] = posts_id[-1]
+                    channel_data['set_last_post_id'] = 0
                 for post in reversed(posts):
                     post_id = int(post.get('id'))
                     if post_id > channel_data['last_post_id'] and await self.is_allowed_post(post):

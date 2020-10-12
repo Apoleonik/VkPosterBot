@@ -31,7 +31,7 @@ class VkApi:
 
     async def _fetch(self, url: str, data: Dict = None) -> Dict:
         """get response from requested url"""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
             response = await self._get_post_response(session, url, data)
             return response
 

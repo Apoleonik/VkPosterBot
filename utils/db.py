@@ -125,9 +125,31 @@ class DbController:
         """delete blacklist word row from blacklist table"""
         self._delete('blacklist', row_id)
 
+    def clear_db(self):
+        """clear existing db"""
+        self._cursor.execute("SELECT name FROM 'sqlite_master' WHERE type='table'")
+        tables = [''.join(name) for name in self._cursor.fetchall()]
+        for table in tables:
+            self._cursor.execute(f"DROP TABLE {table}")
+
     def create_db_dump(self):
-        db_dump_path = os.path.join(PATH, 'db', f'db_dump_{datetime.now().strftime("%d-%m-%y_%H-%M")}.sql')
+        """create db dump file"""
+        directory_path = os.path.join(PATH, 'backup')
+        if not os.path.exists(directory_path):
+            os.mkdir(directory_path)
+        db_dump_path = os.path.join(directory_path, f'db_dump_{datetime.now().strftime("%d-%m-%y_%H-%M")}.sql')
         with open(db_dump_path, 'w', encoding='UTF-8') as f:
             for line in self._connection.iterdump():
                 f.write(f'{line}\n')
             return db_dump_path
+
+    def load_db_dump(self):
+        """load db dump file"""
+        directory_path = os.path.join(PATH, 'backup')
+        dumps = [file for file in os.listdir(directory_path) if 'sql' in file]
+        if dumps:
+            dump_file_path = os.path.join(directory_path, dumps[-1])
+            self.clear_db()
+            with open(dump_file_path, 'r', encoding='UTF-8') as f:
+                dump_file = f.read()
+                self._cursor.executescript(dump_file)

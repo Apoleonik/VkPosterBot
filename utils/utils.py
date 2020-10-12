@@ -1,6 +1,9 @@
+import os
 import json
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.markdown import text, code
+
+PATH = os.path.abspath(os.path.dirname(__file__))
 
 
 def get_menu_kb(controller):
@@ -86,7 +89,9 @@ def get_channel_detail_kb(controller, channel_id):
             flag = 'On 🟢' if channel[key] else 'Off 🔴'
             buttons.append(InlineKeyboardButton(f'{name}: {flag}', callback_data=f'edit-{channel_id}-{index + 1}'))
         [kb.add(btn) for btn in buttons]
-        kb.add(InlineKeyboardButton('♻ Reset Post id', callback_data=f'edit-{channel_id}-98'))
+
+        kb.row(InlineKeyboardButton('Set Last id', callback_data=f'edit-{channel_id}-97'),
+               InlineKeyboardButton('♻ Reset Post id', callback_data=f'edit-{channel_id}-98'))
 
     kb.row(InlineKeyboardButton('⬅ Back', callback_data='channels'),
            InlineKeyboardButton('🗑️', callback_data=f'edit-{channel_id}-99'))
