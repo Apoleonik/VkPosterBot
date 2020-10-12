@@ -32,6 +32,16 @@ async def send_db_dump_file(message: types.Message):
     await message.answer_document(InputFile(db_path))
 
 
+@dp.message_handler(commands=['load'])
+async def load_dump(message: types.Message):
+    if controller.is_working:
+        await controller.stop_parser()
+    controller.db.load_db_dump()
+    controller.parser.blacklist_words = controller.db.get_all_channels()
+    controller.parser.channels = controller.db.get_blacklist_words()
+    await message.answer('Success!')
+
+
 @dp.message_handler(commands=['menu'])
 async def display_menu(message: types.Message):
     kb = utils.get_menu_kb(controller)
@@ -105,6 +115,9 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
 
         if btn_code == 98:
             channel.update({'last_post_id': 0})
+            await controller.update_channel(channel['id'], channel)
+        elif btn_code == 97:
+            channel.update({'set_last_post_id': 1})
             await controller.update_channel(channel['id'], channel)
 
         if not btn_code == 99:
