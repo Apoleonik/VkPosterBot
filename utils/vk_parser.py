@@ -144,9 +144,8 @@ class VkParser(VkApi):
                     content_to_send.extend(content)
                 elif content_type == 'text':
                     content_to_send.append(content)
-                    pass
             try:
-                if not isinstance(content_to_send.pop(), str):
+                if not isinstance(content_to_send[0], str):
                     await self.bot.send_media_group(telegram_channel, content_to_send)
                     break
                 else:
