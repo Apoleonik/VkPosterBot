@@ -10,6 +10,7 @@ CREATE TABLE channels (
     send_photo_post boolean default false,
     send_photo_post_text boolean default false,
     send_text_post boolean default false,
+    set_last_post_id boolean default true,
     timer integer default 60
 );
 
