@@ -159,8 +159,8 @@ class VkParser(VkApi):
             except Exception as error:
                 self.logger.error(f"While sending post {post_url}: {error}")
                 text = f'***Post:*** [link]({post_url})\n***Error:*** {error} '
-                await self.bot.send_message(ADMIN_ID, text, parse_mode='MARKDOWN', disable_web_page_preview=True)
                 if not prepared_content.get('video'):
+                    await self.bot.send_message(ADMIN_ID, text, parse_mode='MARKDOWN', disable_web_page_preview=True)
                     break
                 await asyncio.sleep(5)
 
