@@ -17,6 +17,7 @@ async def display_start(message: types.Message):
                                 '/blacklist - add word to blacklist',
                                 '/log - get bot log',
                                 '/dump - get bot db dump',
+                                '/load - load last db dump',
                                 sep='\n'))
     await message.answer(prepared_text, parse_mode=ParseMode.MARKDOWN_V2)
 
