@@ -111,7 +111,7 @@ class VkParser(VkApi):
                         if prepared_content:
                             self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> '
                                              f'{channel_data["telegram_channel"]}')
-                            # await self.send_content(channel_data, prepared_content, post_url)
+                            await self.send_content(channel_data, prepared_content, post_url)
                             break
                 else:
                     self.logger.info(f'No new posts from {channel_data["vk_channel"]}')
