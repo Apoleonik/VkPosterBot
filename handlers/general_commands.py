@@ -115,9 +115,10 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
             await controller.update_channel(channel['id'], channel)
 
         if btn_code == 98:
-            channel.update({'last_post_id': 0})
+            channel.update({'last_post_id': 0, 'set_last_post_id': 0})
             await controller.update_channel(channel['id'], channel)
         elif btn_code == 97:
+            """will set in next channel check"""
             channel.update({'set_last_post_id': 1})
             await controller.update_channel(channel['id'], channel)
 

@@ -6,7 +6,7 @@ from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from utils.api import VkApi
 from utils.db import DbController
-from utils.utils import normalize_channel_name
+from utils.utils import normalize_channel_name, get_post_url
 
 from config.config import ADMIN_ID
 
@@ -82,35 +82,45 @@ class VkParser(VkApi):
         self.channels_tasks[channel_data['id']] = {'channel_data': channel_data, 'task': task}
         self.logger.debug(f'Created channel task for {channel_data["telegram_channel"]} (id: {channel_data["id"]})')
 
+    @staticmethod
+    async def set_last_post_id(channel_data: Dict, posts: List):
+        """set last post id in channel_data"""
+        if channel_data['set_last_post_id']:
+            posts_id = [post['id'] for post in posts]
+            posts_id.sort()
+            channel_data['last_post_id'] = posts_id[-1]
+            channel_data['set_last_post_id'] = 0
+        return channel_data
+
     async def check_channel(self, channel_data: Dict):
         """check vk channel for new posts and filter them, send content to telegram soon..."""
         while True:
             wall_posts = await self.get_wall_posts(channel_data)
-            is_correct = wall_posts.get('response') and wall_posts['response'].get('count')
+            is_correct = wall_posts.get('response') and wall_posts.get('response').get('count')
             if is_correct:
                 posts = wall_posts['response']['items']
-                if channel_data['set_last_post_id']:
-                    posts_id = [post['id'] for post in posts]
-                    posts_id.sort()
-                    channel_data['last_post_id'] = posts_id[-1]
-                    channel_data['set_last_post_id'] = 0
+                channel_data = await self.set_last_post_id(channel_data, posts)
                 for post in reversed(posts):
                     post_id = int(post.get('id'))
                     if post_id > channel_data['last_post_id'] and await self.is_allowed_post(post):
                         channel_data['last_post_id'] = post_id
 
                         parsed_post = await self._parse_post(post)
-                        post_url = f"https://vk.com/{channel_data['vk_channel']}?w=wall{post['from_id']}_{post['id']}"
+                        post_url = await get_post_url(channel_data, post)
                         prepared_content = await self.prepare_content(channel_data, parsed_post)
                         if prepared_content:
                             self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> '
                                              f'{channel_data["telegram_channel"]}')
-                            await self.send_content(channel_data, prepared_content, post_url)
+                            # await self.send_content(channel_data, prepared_content, post_url)
                             break
                 else:
                     self.logger.info(f'No new posts from {channel_data["vk_channel"]}')
                 self.db.update_channel(channel_data['id'], channel_data)
-            await asyncio.sleep(60 * channel_data['timer'])
+            else:
+                self.logger.info(f'No correct posts for {channel_data["vk_channel"]}')
+                await self.bot.send_message(ADMIN_ID, f'Error: {wall_posts.get("error").get("error_msg")}')
+
+            await asyncio.sleep(60 * int(channel_data['timer']) if channel_data['timer'] else 60 * 60)
 
     async def prepare_content(self, channel_data, parsed_post):
         """prepare post content before send to telegram channel"""
@@ -131,8 +141,8 @@ class VkParser(VkApi):
                 prepared_video = {quality: InputMediaVideo(video, caption=video_text)
                                   for quality, video in parsed_video_data.items()}
             prepared_content.update({'video': prepared_video})
-        elif channel_data['send_text_post'] and parsed_post.text and\
-                not channel_data['send_video_post'] or channel_data['send_photo_post']:
+        elif channel_data['send_text_post'] and parsed_post.text and \
+                not channel_data['send_video_post'] or not channel_data['send_photo_post']:
             prepared_content.update({'text': parsed_post.text})
         return prepared_content
 

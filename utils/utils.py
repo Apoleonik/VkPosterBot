@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Dict
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.markdown import text, code
 
@@ -59,10 +60,10 @@ def paginate_channels_buttons(channels_buttons, callback_name, page: int = 0, pa
 def get_bot_status(controller):
     """get status information"""
     tasks = controller.parser.channels_tasks
-    active_channels = ''
+    active_channels = 'Running: *0/0*' if bool(controller.is_working) else ''
     if tasks:
-        running_tasks = [1 for task_id, data in tasks.items() if data['task'].done()]
-        active_channels = f'Active channels: *{sum(running_tasks)}/{len(tasks)}*'
+        running_tasks = [1 for task_id, data in tasks.items() if not data['task'].done()]
+        active_channels = f'Running: *{sum(running_tasks)}/{len(tasks)}*'
 
     working_status = '🟢' if bool(controller.is_working) else '🔴'
 
@@ -101,9 +102,19 @@ def get_channel_detail_kb(controller, channel_id):
 def format_channel_preview(channel_data):
     """generate channel info text in channel detail menu"""
     return {'telegram_channel': channel_data['telegram_channel'], 'vk_channel': channel_data['vk_channel'],
-            'last_post_id': channel_data['last_post_id'], 'timer': channel_data['timer']}
+            'last_post_id': get_preview_for_last_id(channel_data), 'timer': channel_data['timer']}
+
+
+def get_preview_for_last_id(channel_data):
+    """generate preview for last_post_id param"""
+    return 'will set' if channel_data['set_last_post_id'] else channel_data['last_post_id']
 
 
 async def normalize_channel_name(channel_name):
     """preparing telegram channel name"""
     return f'@{channel_name}' if not channel_name.isdigit() else channel_name
+
+
+async def get_post_url(channel_data: Dict, post: Dict) -> str:
+    """create vk post url"""
+    return f"https://vk.com/{channel_data['vk_channel']}?w=wall{post['from_id']}_{post['id']}"
