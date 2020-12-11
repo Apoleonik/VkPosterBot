@@ -1,8 +1,11 @@
-import os
 import json
+import os
 from typing import Dict
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.markdown import text, code
+
+from aiogram.types import InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup
+from aiogram.utils.markdown import code
+from aiogram.utils.markdown import text
 
 PATH = os.path.abspath(os.path.dirname(__file__))
 
@@ -14,10 +17,17 @@ def get_menu_kb(controller):
         InlineKeyboardButton('Stop' if controller.is_working else 'Start', callback_data='menu2'),
         InlineKeyboardButton('Channels', callback_data='channels'),
         InlineKeyboardButton('Blacklist', callback_data='bl'),
-       ]
+    ]
     kb = InlineKeyboardMarkup()
     [kb.add(btn) for btn in buttons]
     return kb
+
+
+def get_accepted_keys() -> Dict:
+    """get displayable keys"""
+    return {0: 'is_active', 1: 'send_video_post', 2: 'send_video_post_text', 3: 'send_photo_post',
+            4: 'send_photo_post_text', 5: 'send_text_post',
+            6: 'enable_filters'}
 
 
 def get_blacklist_kb(controller, callback_name, page: int = None):
@@ -81,15 +91,17 @@ def get_channel_detail_kb(controller, channel_id):
     kb = InlineKeyboardMarkup()
     if channel_data:
         channel = channel_data[0]
-        accepted_keys = ['send_video_post', 'send_video_post_text',
-                         'send_photo_post', 'send_photo_post_text', 'send_text_post']
-        buttons = [InlineKeyboardButton('Disable' if channel['is_active'] else 'Enable',
-                                        callback_data=f'edit-{channel_id}-0')]
-        for index, key in enumerate(accepted_keys):
-            name = ' '.join(key.split('_')).title()
-            flag = 'On 🟢' if channel[key] else 'Off 🔴'
-            buttons.append(InlineKeyboardButton(f'{name}: {flag}', callback_data=f'edit-{channel_id}-{index + 1}'))
-        [kb.add(btn) for btn in buttons]
+
+        accepted_keys = get_accepted_keys()
+        for index, value in accepted_keys.items():
+            name = ' '.join(value.split('_')).title()
+            flag = 'On 🟢' if channel[value] else 'Off 🔴'
+            callback_data = f'edit-{channel_id}-{index}'
+            if value == 'is_active':
+                kb.add(InlineKeyboardButton('Disable' if channel['is_active'] else 'Enable',
+                                                    callback_data=callback_data))
+            else:
+                kb.add(InlineKeyboardButton(f'{name}: {flag}', callback_data=callback_data))
 
         kb.row(InlineKeyboardButton('Set Last id', callback_data=f'edit-{channel_id}-97'),
                InlineKeyboardButton('♻ Reset Post id', callback_data=f'edit-{channel_id}-98'))
