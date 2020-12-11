@@ -106,8 +106,7 @@ async def process_callback_channels(callback_query: types.CallbackQuery):
     if btn_code.isdigit() and channel_data:
         channel = channel_data[0]
         btn_code = int(btn_code)
-        accepted_keys = {0: 'is_active', 1: 'send_video_post', 2: 'send_video_post_text',
-                         3: 'send_photo_post', 4: 'send_photo_post_text', 5: 'send_text_post'}
+        accepted_keys = utils.get_accepted_keys()
 
         key = accepted_keys.get(btn_code)
         if key:
