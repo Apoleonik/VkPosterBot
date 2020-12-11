@@ -45,6 +45,9 @@ class VkParser(VkApi):
                 video = attachment['video']
                 video_id = f"{video['owner_id']}_{video['id']}_{video['access_key']}"
                 parsed_attachments[attachment_type].append(video_id)
+            elif attachment_type == 'link':
+                link = attachment['link']
+                parsed_attachments[attachment_type].append(link['url'])
         return parsed_attachments
 
     async def _parse_post(self, data: Dict) -> Post:
@@ -93,7 +96,7 @@ class VkParser(VkApi):
         return channel_data
 
     async def check_channel(self, channel_data: Dict):
-        """check vk channel for new posts and filter them, send content to telegram soon..."""
+        """check vk channel for new posts and filter them"""
         while True:
             wall_posts = await self.get_wall_posts(channel_data)
             is_correct = wall_posts.get('response') and wall_posts.get('response').get('count')
@@ -102,15 +105,16 @@ class VkParser(VkApi):
                 channel_data = await self.set_last_post_id(channel_data, posts)
                 for post in reversed(posts):
                     post_id = int(post.get('id'))
-                    if post_id > channel_data['last_post_id'] and await self.is_allowed_post(post):
+                    is_allowed_post = True if not channel_data['enable_filters'] else await self.is_allowed_post(post)
+                    if post_id > channel_data['last_post_id'] and is_allowed_post:
                         channel_data['last_post_id'] = post_id
-
                         parsed_post = await self._parse_post(post)
                         post_url = await get_post_url(channel_data, post)
                         prepared_content = await self.prepare_content(channel_data, parsed_post)
                         if prepared_content:
                             self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> '
                                              f'{channel_data["telegram_channel"]}')
+
                             await self.send_content(channel_data, prepared_content, post_url)
                             break
                 else:
@@ -125,10 +129,12 @@ class VkParser(VkApi):
     async def prepare_content(self, channel_data, parsed_post):
         """prepare post content before send to telegram channel"""
         prepared_content = {}
+        post_text = parsed_post.text
         photo_text = parsed_post.text if channel_data['send_photo_post_text'] else ''
         video_text = parsed_post.text if channel_data['send_video_post_text'] else ''
         photo_attachments = parsed_post.attachments.get('photo')
         video_attachments = parsed_post.attachments.get('video')
+        link_attachments = parsed_post.attachments.get('link')
         if channel_data['send_photo_post'] and photo_attachments:
             prepared_photo = [InputMediaPhoto(photo) for photo in photo_attachments]
             prepared_photo[0].caption = photo_text
@@ -141,9 +147,11 @@ class VkParser(VkApi):
                 prepared_video = {quality: InputMediaVideo(video, caption=video_text)
                                   for quality, video in parsed_video_data.items()}
             prepared_content.update({'video': prepared_video})
-        elif channel_data['send_text_post'] and parsed_post.text and \
-                not channel_data['send_video_post'] or not channel_data['send_photo_post']:
-            prepared_content.update({'text': parsed_post.text})
+        elif channel_data['send_text_post'] and post_text and not (photo_text and video_text):
+            prepared_content.update({'text': post_text})
+        elif not channel_data['enable_filters'] and link_attachments:
+            additional_text = [f'[link]({link})' for link in link_attachments if link not in post_text]
+            prepared_content.update({'text': '\n\n'.join([' |'.join(additional_text), post_text])})
         return prepared_content
 
     async def send_content(self, channel_data: Dict, prepared_content: Dict, post_url: str):
@@ -164,7 +172,7 @@ class VkParser(VkApi):
                     await self.bot.send_media_group(telegram_channel, content_to_send)
                     break
                 else:
-                    await self.bot.send_message(telegram_channel, content_to_send.pop())
+                    await self.bot.send_message(telegram_channel, content_to_send.pop(), parse_mode='MARKDOWN')
                     break
             except Exception as error:
                 self.logger.error(f"While sending post {post_url}: {error}")
