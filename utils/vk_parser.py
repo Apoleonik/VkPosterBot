@@ -1,14 +1,19 @@
 import asyncio
-from typing import Dict, List, NamedTuple
 from collections import defaultdict
-from aiogram import Bot
-from aiogram.types import InputMediaPhoto, InputMediaVideo
+from typing import Dict
+from typing import List
+from typing import NamedTuple
 
-from utils.api import VkApi
-from utils.db import DbController
-from utils.utils import normalize_channel_name, get_post_url
+from aiogram import Bot
+from aiogram.types import InputMediaPhoto
+from aiogram.types import InputMediaVideo
 
 from config.config import ADMIN_ID
+from utils.api import VkApi
+from utils.db import DbController
+from utils.utils import clear_media_caption
+from utils.utils import get_post_url
+from utils.utils import normalize_channel_name
 
 
 class Post(NamedTuple):
@@ -33,8 +38,7 @@ class VkParser(VkApi):
 
         self.channels_tasks = {}
 
-    @staticmethod
-    async def _parse_post_attachment(attachments: List[Dict]) -> Dict:
+    async def _parse_post_attachment(self, attachments: List[Dict]) -> Dict:
         """parse post attachments by type"""
         parsed_attachments = defaultdict(list)
         for attachment in attachments:
@@ -42,12 +46,15 @@ class VkParser(VkApi):
             if attachment_type == 'photo':
                 parsed_attachments[attachment_type].append(attachment['photo']['sizes'][-1]['url'])
             elif attachment_type == 'video':
-                video = attachment['video']
-                video_id = f"{video['owner_id']}_{video['id']}_{video['access_key']}"
-                parsed_attachments[attachment_type].append(video_id)
+                parsed_video = await self._parse_video(attachment)
+                if parsed_video['platform'] == 'youtube':
+                    parsed_attachments['link'].append(parsed_video) if parsed_video['url'] else ''
+                else:
+                    parsed_attachments[attachment_type].append(parsed_video['id'])
             elif attachment_type == 'link':
                 link = attachment['link']
-                parsed_attachments[attachment_type].append(link['url'])
+                link_title = await self._prepare_markdown_text(link['title']) if link.get('title') else 'link'
+                parsed_attachments[attachment_type].append({'title': link_title, 'url': link['url']})
         return parsed_attachments
 
     async def _parse_post(self, data: Dict) -> Post:
@@ -55,6 +62,22 @@ class VkParser(VkApi):
         attachments = await self._parse_post_attachment(data['attachments']) if data.get('attachments') else dict()
         return Post(id=data['id'], owner_id=data['owner_id'], date=data['date'],
                     text=data['text'], attachments=attachments)
+
+    async def _parse_video(self, video_data: Dict) -> Dict:
+        """parse video from vk api json"""
+        video = video_data['video']
+        video_title = 'video' if not video.get('title') else await self._prepare_markdown_text(video['title'])
+        video_id = f"{video['owner_id']}_{video['id']}_{video['access_key']}"
+        video_platform = video.get('platform').lower() if video.get('platform') else ''
+        video_data = await self.get_video_data(video_id)
+        video_url = video_data['response']['items'][0]['files'].get('external')
+        return {'title': video_title, 'url': video_url if video_url else '',
+                'platform': video_platform, 'id': video_id}
+
+    @staticmethod
+    async def _prepare_markdown_text(text: str) -> str:
+        """convert text to markdown"""
+        return text.replace('[', '(').replace(']', ')')
 
     async def is_allowed_post(self, data: Dict) -> bool:
         """check post for blacklist words, advertisement and copyrights"""
@@ -114,7 +137,6 @@ class VkParser(VkApi):
                         if prepared_content:
                             self.logger.info(f'Found new post from {channel_data["vk_channel"]} -> '
                                              f'{channel_data["telegram_channel"]}')
-
                             await self.send_content(channel_data, prepared_content, post_url)
                             break
                 else:
@@ -150,8 +172,8 @@ class VkParser(VkApi):
         elif channel_data['send_text_post'] and post_text and not (photo_text and video_text):
             prepared_content.update({'text': post_text})
         elif not channel_data['enable_filters'] and link_attachments:
-            additional_text = [f'[link]({link})' for link in link_attachments if link not in post_text]
-            prepared_content.update({'text': '\n\n'.join([' |'.join(additional_text), post_text])})
+            links = [f'[{link["title"]}]({link["url"]})\n' for link in link_attachments if link["url"] not in post_text]
+            prepared_content.update({'text': '\n'.join([' |'.join(links), post_text])})
         return prepared_content
 
     async def send_content(self, channel_data: Dict, prepared_content: Dict, post_url: str):
@@ -168,11 +190,22 @@ class VkParser(VkApi):
                 elif content_type == 'text':
                     content_to_send.append(content)
             try:
-                if not isinstance(content_to_send[0], str):
-                    await self.bot.send_media_group(telegram_channel, content_to_send)
-                    break
+                content = content_to_send[0]
+                media_text_limit = 1024
+                message_text_limit = 4096
+
+                if not isinstance(content, str):
+                    text = content.caption
+                    if len(text) > media_text_limit:
+                        cleared_media_group = await clear_media_caption(content_to_send)
+                        media_message = await self.bot.send_media_group(telegram_channel, cleared_media_group)
+                        await media_message.pop().reply(text[:message_text_limit], disable_web_page_preview=True)
+                        break
+                    else:
+                        await self.bot.send_media_group(telegram_channel, content_to_send)
+                        break
                 else:
-                    await self.bot.send_message(telegram_channel, content_to_send.pop(), parse_mode='MARKDOWN')
+                    await self.bot.send_message(telegram_channel, content, parse_mode='MARKDOWN')
                     break
             except Exception as error:
                 self.logger.error(f"While sending post {post_url}: {error}")
