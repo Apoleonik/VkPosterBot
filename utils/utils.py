@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict
+from typing import List
 
 from aiogram.types import InlineKeyboardButton
 from aiogram.types import InlineKeyboardMarkup
@@ -99,7 +100,7 @@ def get_channel_detail_kb(controller, channel_id):
             callback_data = f'edit-{channel_id}-{index}'
             if value == 'is_active':
                 kb.add(InlineKeyboardButton('Disable' if channel['is_active'] else 'Enable',
-                                                    callback_data=callback_data))
+                                            callback_data=callback_data))
             else:
                 kb.add(InlineKeyboardButton(f'{name}: {flag}', callback_data=callback_data))
 
@@ -130,3 +131,12 @@ async def normalize_channel_name(channel_name):
 async def get_post_url(channel_data: Dict, post: Dict) -> str:
     """create vk post url"""
     return f"https://vk.com/{channel_data['vk_channel']}?w=wall{post['from_id']}_{post['id']}"
+
+
+async def clear_media_caption(medias: List):
+    """clearing media caption"""
+    medias_cleared = []
+    for media in medias:
+        media.caption = ''
+        medias_cleared.append(media)
+    return medias_cleared
