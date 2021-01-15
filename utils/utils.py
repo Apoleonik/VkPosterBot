@@ -125,7 +125,8 @@ def get_preview_for_last_id(channel_data):
 
 async def normalize_channel_name(channel_name):
     """preparing telegram channel name"""
-    return f'@{channel_name}' if not channel_name.isdigit() else channel_name
+    is_num = channel_name.replace('-', '').isnumeric()
+    return f'@{channel_name}' if not is_num else channel_name
 
 
 async def get_post_url(channel_data: Dict, post: Dict) -> str:
