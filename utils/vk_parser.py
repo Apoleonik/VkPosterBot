@@ -8,7 +8,7 @@ from aiogram import Bot
 from aiogram.types import InputMediaPhoto
 from aiogram.types import InputMediaVideo
 
-from config.config import ADMIN_ID
+from config.settings import ADMIN_ID
 from utils.api import VkApi
 from utils.db import DbController
 from utils.utils import clear_media_caption
