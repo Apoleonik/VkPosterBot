@@ -5,3 +5,4 @@ __pycache__/
 .gitignore
 log.txt
 config/config.py
+.venv
